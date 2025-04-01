@@ -30,12 +30,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.6
-  # flutter_launcher_icons: ^0.9.2
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  image_picker: ^1.0.7
+  http: ^1.2.0
+  flutter_dotenv: ^5.1.0
+  wakelock_plus: ^1.1.4
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
+  url_launcher: ^6.2.5
+  intl: ^0.18.1
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:
@@ -46,14 +52,27 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^3.0.0
+  flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.14.2
   
 
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.jpg"
+  image_path: "assets/images/playstore.png"
+  min_sdk_android: 16 # android min sdk min:16, default 21
+  web:
+    generate: true
+    image_path: "assets/images/logo.jpg"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/images/logo.jpg"
+    icon_size: 48 # min:48, max:256, default: 48
+  macos:
+    generate: true
+    image_path: "assets/images/logo.jpg"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -67,11 +86,12 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  generate: true
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/background.png
-    - assets/images/logo.jpg
+    - assets/images/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

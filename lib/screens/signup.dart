@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class Signup extends StatefulWidget {
   @override
@@ -6,17 +7,21 @@ class Signup extends StatefulWidget {
 }
 
 class _Signup extends State<Signup> {
-  final TextEditingController _mobileController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _verificationCodeController = TextEditingController();
+  bool _isLoading = false;
+  bool _showVerification = false;
+  bool _isVerifying = false;
 
-  void _showAlert(String message) {
+  void _showAlert(String title, String message) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Error'),
+          title: Text(title),
           content: Text(message),
           actions: [
             TextButton(
@@ -31,23 +36,82 @@ class _Signup extends State<Signup> {
     );
   }
 
-  void _signUp() {
-    String mobile = _mobileController.text;
+  Future<void> _signUp() async {
+    String username = _usernameController.text;
+    String email = _emailController.text;
     String password = _passwordController.text;
     String confirmPassword = _confirmPasswordController.text;
 
-    if (mobile.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
-      _showAlert('Please fill out all fields.');
+    // Basic validation
+    if (username.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      _showAlert('Error', 'Please fill out all fields.');
       return;
     }
 
     if (password != confirmPassword) {
-      _showAlert('Passwords do not match.');
+      _showAlert('Error', 'Passwords do not match.');
       return;
     }
 
-    // Proceed with signup logic
-    _showAlert('Sign up successful!');
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      _showAlert('Error', 'Please enter a valid email address.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await ApiService.register(username, email, password);
+      setState(() => _isLoading = false);
+
+      if (response['success']) {
+        // Store tokens if provided in response
+        if (response['data'] != null && 
+            response['data']['accessToken'] != null && 
+            response['data']['refreshToken'] != null) {
+          await ApiService.storeTokens(
+            response['data']['accessToken'],
+            response['data']['refreshToken'],
+          );
+        }
+        
+        setState(() => _showVerification = true);
+        _showAlert('Success', 'Verification code sent to your email.');
+      } else {
+        _showAlert('Error', response['message']);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showAlert('Error', 'An error occurred. Please try again.');
+    }
+  }
+
+  Future<void> _verifyEmail() async {
+    String code = _verificationCodeController.text;
+    String email = _emailController.text;
+
+    if (code.isEmpty) {
+      _showAlert('Error', 'Please enter the verification code.');
+      return;
+    }
+
+    setState(() => _isVerifying = true);
+
+    try {
+      final response = await ApiService.verifyEmail(email, code);
+      setState(() => _isVerifying = false);
+
+      if (response['success']) {
+        await ApiService.setUserVerified();
+        _showAlert('Success', 'Registration completed successfully!');
+        Navigator.pushReplacementNamed(context, '/signin');
+      } else {
+        _showAlert('Error', response['message']);
+      }
+    } catch (e) {
+      setState(() => _isVerifying = false);
+      _showAlert('Error', 'An error occurred. Please try again.');
+    }
   }
 
   @override
@@ -85,57 +149,66 @@ class _Signup extends State<Signup> {
                   style: TextStyle(color: Colors.grey),
                 ),
                 SizedBox(height: 30),
-                _buildTextField(_mobileController, 'Mobile Number'),
-                SizedBox(height: 15),
-                _buildTextField(_passwordController, 'Password',
-                    obscureText: true),
-                SizedBox(height: 15),
-                _buildTextField(_confirmPasswordController, 'Confirm Password',
-                    obscureText: true),
-                SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: _signUp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                    padding: EdgeInsets.symmetric(vertical: 15),
+                if (!_showVerification) ...[
+                  _buildTextField(_usernameController, 'Username'),
+                  SizedBox(height: 15),
+                  _buildTextField(_emailController, 'Email'),
+                  SizedBox(height: 15),
+                  _buildTextField(_passwordController, 'Password', obscureText: true),
+                  SizedBox(height: 15),
+                  _buildTextField(_confirmPasswordController, 'Confirm Password', obscureText: true),
+                ] else ...[
+                  Text(
+                    'Enter Verification Code',
+                    style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
-                  child: Center(
-                    child: Text(
-                      'Sign Up',
-                      style: TextStyle(
+                  SizedBox(height: 10),
+                  _buildTextField(_verificationCodeController, 'Verification Code'),
+                ],
+                SizedBox(height: 30),
+                if (_isLoading || _isVerifying)
+                  Center(child: CircularProgressIndicator())
+                else
+                  ElevatedButton(
+                    onPressed: _showVerification ? _verifyEmail : _signUp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 15),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _showVerification ? 'Verify Email' : 'Sign Up',
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white),
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(height: 20),
-                Center(
-                  child: Text(
-                    'Or continue with',
-                    style: TextStyle(color: Colors.grey),
+                if (!_showVerification) ...[
+                  SizedBox(height: 20),
+                  Center(
+                    child: Text(
+                      'Or continue with',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ),
-                ),
-                SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Uncomment and add Google login if needed
-                    // _buildSocialButton(Icons.google, Colors.red),
-                    SizedBox(width: 20),
-                    _buildSocialButton(Icons.apple, Colors.black),
-                  ],
-                ),
+                  SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildSocialButton(Icons.apple, Colors.black),
+                    ],
+                  ),
+                ],
                 SizedBox(height: 20),
                 Center(
                   child: GestureDetector(
-                    onTap: () {
-                      // Navigate to sign-in page
-                      Navigator.pushNamed(context, '/signin');
-                    },
+                    onTap: () => Navigator.pushNamed(context, '/signin'),
                     child: Text(
                       'Already have an account? Sign In',
                       style: TextStyle(
